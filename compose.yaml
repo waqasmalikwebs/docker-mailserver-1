@@ -3,7 +3,7 @@ services:
     image: ghcr.io/docker-mailserver/docker-mailserver:latest
     container_name: mailserver
     # Provide the FQDN of your mail server here (Your DNS MX record should point to this value)
-    hostname: mail.example.com
+    hostname: mail.webicot.com
     env_file: mailserver.env
     # More information about the mail-server ports:
     # https://docker-mailserver.github.io/docker-mailserver/latest/config/security/understanding-the-ports/
@@ -28,3 +28,38 @@ services:
       test: "ss --listening --tcp | grep -P 'LISTEN.+:smtp' || exit 1"
       timeout: 3s
       retries: 0
+
+  # roundcube app and database
+
+  roundcube_db:
+    image: mariadb:latest
+    container_name: roundcube_db
+    restart: unless-stopped
+    volumes:
+      - ./roundcube/db/mysql:/var/lib/mysql
+    ports:
+      - 34010:5432
+      - 33006:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD=roundcube-mysql-pw
+      - MYSQL_DATABASE=roundcubemail
+
+  roundcubemail:
+    image: roundcube/roundcubemail:latest
+    container_name: roundcubemail
+    restart: unless-stopped
+    depends_on:
+      - roundcube_db
+    links:
+      - roundcube_db
+    volumes:
+      - ./roundcube/www:/var/www/html
+    ports:
+      - 9002:80
+    environment:
+      - ROUNDCUBEMAIL_DB_TYPE=mysql
+      - ROUNDCUBEMAIL_DB_HOST=roundcube_db
+      - ROUNDCUBEMAIL_DB_PASSWORD=roundcube-mysql-pw
+      - ROUNDCUBEMAIL_SKIN=elastic
+      - ROUNDCUBEMAIL_DEFAULT_HOST=tls://mail.webicot.com
+      - ROUNDCUBEMAIL_SMTP_SERVER=tls://mail.webicot.com
